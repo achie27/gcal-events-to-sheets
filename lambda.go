@@ -3,10 +3,24 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 	"regexp"
 
 	"github.com/aws/aws-lambda-go/events"
+	"google.golang.org/api/calendar/v3"
 )
+
+type EventInfo struct {
+	Id          string
+	EmailIds    []string
+	Entities    []string
+	Summary     string
+	Description string
+	Organizer   string
+	Start       string
+	Created     string
+	CalendarId  string
+}
 
 var calendarIdRegex = regexp.MustCompile(`calendar/v3/calendars/\s*(.*?)\s*/events`)
 
@@ -21,6 +35,28 @@ func handler(ctx context.Context, request *events.LambdaFunctionURLRequest) (eve
 		return events.LambdaFunctionURLResponse{StatusCode: 400}, errors.New("Not it")
 	}
 
+	eventInfo := extractInfoFromEvent(event, match[1])
+	if len(eventInfo.EmailIds) == 0 {
+		log.Printf("Event not relevant: %+v", eventInfo)
+		return events.LambdaFunctionURLResponse{StatusCode: 200}, nil
+	}
+
+	return events.LambdaFunctionURLResponse{StatusCode: 200}, nil
+}
+
+func extractInfoFromEvent(event *calendar.Event, calendarId string) *EventInfo {
+	organizer, start := "", ""
+
+	if event.Organizer != nil {
+		organizer = event.Organizer.Email
+	} else if event.Creator != nil {
+		organizer = event.Creator.Email
+	}
+
+	if event.Start != nil {
+		start = event.Start.DateTime
+	}
+
 	extractedEmails := []string{}
 	extractedEntities := []string{}
 
@@ -31,8 +67,21 @@ func handler(ctx context.Context, request *events.LambdaFunctionURLRequest) (eve
 			extractedEntities = append(extractedEntities, attn.DisplayName)
 		}
 	}
+	extractedEmails = filterEmails(extractedEmails)
 
-	// eventText := strings.Join(event.Summary, " ", event.Description)
+	eventText := event.Summary + "\n" + event.Description
+	extractedEmails = append(extractedEmails, extractAndFilterEmailsFromText(eventText)...)
+	extractedEntities = append(extractedEntities, extractEntitiesFromText(eventText)...)
 
-	return events.LambdaFunctionURLResponse{StatusCode: 200}, nil
+	return &EventInfo{
+		Id:          event.Id,
+		EmailIds:    extractedEmails,
+		Entities:    extractedEntities,
+		Summary:     event.Summary,
+		Description: event.Description,
+		Created:     event.Created,
+		Organizer:   organizer,
+		Start:       start,
+		CalendarId:  calendarId,
+	}
 }
