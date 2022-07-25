@@ -10,7 +10,7 @@ import (
 
 func handler(ctx context.Context, request *events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
 	if request.Headers["X-Goog-Channel-ID"] != WHITELISTED_CHANNEL_ID {
-		return events.LambdaFunctionURLResponse{}, errors.New("Not it")
+		return events.LambdaFunctionURLResponse{StatusCode: 400}, errors.New("Not it")
 	}
 
 	log.Println(request)
