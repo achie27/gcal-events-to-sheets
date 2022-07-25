@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"google.golang.org/api/calendar/v3"
@@ -18,7 +19,12 @@ var GOOGLE_OAUTH_ACCESS_TOKEN = os.Getenv("GOOGLE_OAUTH_ACCESS_TOKEN")
 var GOOGLE_OAUTH_TOKEN_TYPE = os.Getenv("GOOGLE_OAUTH_TOKEN_TYPE")
 var GOOGLE_OAUTH_REFRESH_TOKEN = os.Getenv("GOOGLE_OAUTH_REFRESH_TOKEN")
 var GOOGLE_OAUTH_EXPIRY = os.Getenv("GOOGLE_OAUTH_EXPIRY")
+
 var WHITELISTED_CHANNEL_ID = os.Getenv("WHITELISTED_CHANNEL_ID")
+
+// var DO_EMAIL_EXTRACTION, _ = strconv.ParseBool(os.Getenv("DO_EMAIL_EXTRACTION"))
+// var DO_ENTITY_EXTRACTION, _ = strconv.ParseBool(os.Getenv("DO_ENTITY_EXTRACTION"))
+var EMAIL_DOMAIN_BLACKLIST = strings.Split(os.Getenv("EMAIL_DOMAIN_BLACKLIST"), ",")
 
 var gClient *http.Client
 var gCalSrv *calendar.Service
