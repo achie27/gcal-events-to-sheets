@@ -17,3 +17,5 @@
 *.json
 *.db
 *.txt
+*env
+*zip

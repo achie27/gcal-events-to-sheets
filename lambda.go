@@ -30,6 +30,10 @@ func handler(ctx context.Context, request *events.LambdaFunctionURLRequest) (eve
 		return events.LambdaFunctionURLResponse{StatusCode: 400}, errors.New("Not it")
 	}
 
+	if request.Headers["X-Goog-Resource-State"] == "sync" {
+		return events.LambdaFunctionURLResponse{StatusCode: 200}, nil
+	}
+
 	match := calendarIdRegex.FindStringSubmatch(request.Headers["X-Goog-Resource-URI"])
 	event, err := gCalSrv.Events.Get(match[1], request.Headers["X-Goog-Resource-ID"]).Do()
 	if err != nil {
