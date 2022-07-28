@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/url"
 	"regexp"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"google.golang.org/api/calendar/v3"
@@ -26,32 +29,43 @@ type EventInfo struct {
 var calendarIdRegex = regexp.MustCompile(`calendar/v3/calendars/\s*(.*?)\s*/events`)
 
 func handler(ctx context.Context, request *events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
-	if request.Headers["X-Goog-Channel-ID"] != WHITELISTED_CHANNEL_ID {
-		return events.LambdaFunctionURLResponse{StatusCode: 400}, errors.New("Not it")
+	log.Printf("Event: %+v", request)
+
+	if request.Headers["x-goog-channel-id"] != WHITELISTED_CHANNEL_ID {
+		return events.LambdaFunctionURLResponse{StatusCode: 400}, errors.New("Not a whitelisted channel")
 	}
 
-	if request.Headers["X-Goog-Resource-State"] == "sync" {
+	if request.Headers["x-goog-resource-state"] == "sync" {
 		return events.LambdaFunctionURLResponse{StatusCode: 200}, nil
 	}
 
-	match := calendarIdRegex.FindStringSubmatch(request.Headers["X-Goog-Resource-URI"])
-	event, err := gCalSrv.Events.Get(match[1], request.Headers["X-Goog-Resource-ID"]).Do()
+	resourceUrl, err := url.Parse(request.Headers["x-goog-resource-uri"])
 	if err != nil {
-		return events.LambdaFunctionURLResponse{StatusCode: 400}, errors.New("Not it")
+		return events.LambdaFunctionURLResponse{StatusCode: 400}, err
 	}
 
-	eventInfo := extractInfoFromEvent(event, match[1])
-	if len(eventInfo.EmailIds) == 0 {
-		log.Printf("Event not relevant: %+v\n", eventInfo)
-		return events.LambdaFunctionURLResponse{StatusCode: 200}, nil
+	match := calendarIdRegex.FindStringSubmatch(resourceUrl.Path)
+
+	// TODO: add synctoken
+	calEvents, err := gCalSrv.Events.List(match[1]).TimeMin(time.Now().Format(time.RFC3339)).Do()
+	if err != nil {
+		return events.LambdaFunctionURLResponse{StatusCode: 400}, err
 	}
 
-	sheetRow := [][]interface{}{{eventInfo.Id, eventInfo.Summary, eventInfo.Description, eventInfo.EmailIds, eventInfo.Start, eventInfo.Organizer, eventInfo.CalendarId, eventInfo.Created, eventInfo.Entities}}
+	for _, event := range calEvents.Items {
+		eventInfo := extractInfoFromEvent(event, match[1])
+		if len(eventInfo.EmailIds) == 0 {
+			log.Printf("Event not relevant: %+v\n", eventInfo)
+			continue
+		}
 
-	_, err = gSheetsSrv.Spreadsheets.Values.Append(SPREADSHEET_ID, "Sheet1", &sheets.ValueRange{Values: sheetRow}).InsertDataOption("INSERT_ROWS").Do()
-	if err != nil {
-		log.Printf("Sheets erred: %v", err)
-		return events.LambdaFunctionURLResponse{StatusCode: 500}, err
+		sheetRow := [][]interface{}{{eventInfo.Id, eventInfo.Summary, eventInfo.Description, strings.Join(eventInfo.EmailIds, ","), eventInfo.Start, eventInfo.Organizer, eventInfo.CalendarId, eventInfo.Created, strings.Join(eventInfo.Entities, ",")}}
+
+		_, err = gSheetsSrv.Spreadsheets.Values.Append(SPREADSHEET_ID, "Sheet1", &sheets.ValueRange{Values: sheetRow}).InsertDataOption("INSERT_ROWS").ValueInputOption("RAW").Do()
+		if err != nil {
+			log.Printf("Sheets erred: %v", err)
+			return events.LambdaFunctionURLResponse{StatusCode: 500}, err
+		}
 	}
 
 	return events.LambdaFunctionURLResponse{StatusCode: 200}, nil
