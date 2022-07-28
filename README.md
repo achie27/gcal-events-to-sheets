@@ -2,7 +2,7 @@
 I created this to find out about all the events with external attendees happening in my org.
 
 ### Pre-requisites
-- Get creds, with `calendar.CalendarReadonlyScope` and `sheets.SpreadsheetsScope`, scopes using [this guide](https://developers.google.com/calendar/api/quickstart/go)
+- Get creds, with `calendar.CalendarReadonlyScope` and `sheets.SpreadsheetsScope` scopes, using [this guide](https://developers.google.com/calendar/api/quickstart/go)
 - Post deploying this lambda, you need to call the [watch events](https://developers.google.com/calendar/api/v3/reference/events/watch) API, with this lambda's function URL as part of the request and all the public calendars you want to watch, for Google to actually send webhooks.
 
 ### Pseudo-issues
