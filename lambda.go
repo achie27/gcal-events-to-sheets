@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"google.golang.org/api/calendar/v3"
+	"google.golang.org/api/sheets/v4"
 )
 
 type EventInfo struct {
@@ -37,8 +38,16 @@ func handler(ctx context.Context, request *events.LambdaFunctionURLRequest) (eve
 
 	eventInfo := extractInfoFromEvent(event, match[1])
 	if len(eventInfo.EmailIds) == 0 {
-		log.Printf("Event not relevant: %+v", eventInfo)
+		log.Printf("Event not relevant: %+v\n", eventInfo)
 		return events.LambdaFunctionURLResponse{StatusCode: 200}, nil
+	}
+
+	sheetRow := [][]interface{}{{eventInfo.Id, eventInfo.Summary, eventInfo.Description, eventInfo.EmailIds, eventInfo.Start, eventInfo.Organizer, eventInfo.CalendarId, eventInfo.Created, eventInfo.Entities}}
+
+	_, err = gSheetsSrv.Spreadsheets.Values.Append(SPREADSHEET_ID, "Sheet1", &sheets.ValueRange{Values: sheetRow}).InsertDataOption("INSERT_ROWS").Do()
+	if err != nil {
+		log.Printf("Sheets erred: %v", err)
+		return events.LambdaFunctionURLResponse{StatusCode: 500}, err
 	}
 
 	return events.LambdaFunctionURLResponse{StatusCode: 200}, nil
