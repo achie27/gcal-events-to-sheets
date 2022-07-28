@@ -31,7 +31,7 @@ var calendarIdRegex = regexp.MustCompile(`calendar/v3/calendars/\s*(.*?)\s*/even
 func handler(ctx context.Context, request *events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
 	log.Printf("Event: %+v", request)
 
-	if strings.HasPrefix(request.Headers["x-goog-channel-id"], WHITELISTED_CHANNEL_ID) {
+	if !strings.HasPrefix(request.Headers["x-goog-channel-id"], WHITELISTED_CHANNEL_ID) {
 		return events.LambdaFunctionURLResponse{StatusCode: 400}, errors.New("Not a whitelisted channel")
 	}
 
